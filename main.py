@@ -115,7 +115,8 @@ class WeatherApp(tk.Tk):
         self.configure(bg="black")
 
         self.api_key = get_setting("api_key")
-        self.zipcode = get_setting("zipcode")
+        self.lat = get_setting("lat")
+        self.lon = get_setting("lon")
         self.icon_cache = {}
 
         # Mouse Idle Logic
@@ -125,7 +126,7 @@ class WeatherApp(tk.Tk):
 
         self.setup_ui()
 
-        if not self.api_key or not self.zipcode:
+        if not self.api_key or not self.lat or not self.lon:
             self.after(1000, self.show_setup_dialog)
         else:
             self.after(500, self.update_weather)
@@ -137,10 +138,8 @@ class WeatherApp(tk.Tk):
         if not self.cursor_visible:
             self.config(cursor="arrow")
             self.cursor_visible = True
-
         if self.hide_timer:
             self.after_cancel(self.hide_timer)
-
         # 180000ms = 3 minutes
         self.hide_timer = self.after(180000, self.hide_cursor)
 
@@ -152,7 +151,6 @@ class WeatherApp(tk.Tk):
         cache_key = f"{icon_code}{size}"
         if cache_key in self.icon_cache:
             return self.icon_cache[cache_key]
-
         icon_path = os.path.join(application_path, "images", f"{icon_code}_t{size}.png")
         try:
             if not os.path.exists(icon_path):
@@ -175,15 +173,14 @@ class WeatherApp(tk.Tk):
 
         self.settings_btn = tk.Button(self.top_bar, text=" ⚙ CONFIGURATION ", font=("Arial", 10, "bold"),
                                       fg="white", bg="#444", bd=1, relief="raised",
-                                      activebackground="#666", activeforeground="white",
                                       command=self.show_setup_dialog)
         self.settings_btn.pack(side="right", padx=10, pady=5)
         self.settings_btn.bind("<Motion>", self.reset_cursor_timer)
 
         # 2. Alert Scroller
-        self.alert_canvas = tk.Canvas(self, height=35, bg="darkred", highlightthickness=0)
+        self.alert_canvas = tk.Canvas(self, height=35, bg="#111", highlightthickness=0)
         self.alert_canvas.pack(side="bottom", fill="x")
-        self.alert_text = self.alert_canvas.create_text(800, 17, text="Connecting to weather service...",
+        self.alert_text = self.alert_canvas.create_text(800, 17, text="Initializing...",
                                                         fill="white", font=("Arial", 11, "bold"), anchor="w")
         self.alert_canvas.bind("<Motion>", self.reset_cursor_timer)
 
@@ -198,43 +195,32 @@ class WeatherApp(tk.Tk):
 
         self.curr_left = tk.Frame(self.main_frame, bg="black")
         self.curr_left.pack(side="left", fill="both", expand=True)
-        self.curr_left.bind("<Motion>", self.reset_cursor_timer)
 
         self.city_label = tk.Label(self.curr_left, text="---", font=("Arial", 24), fg="white", bg="black")
         self.city_label.pack(anchor="w")
-        self.city_label.bind("<Motion>", self.reset_cursor_timer)
 
         self.temp_row = tk.Frame(self.curr_left, bg="black")
         self.temp_row.pack(anchor="w")
-        self.temp_row.bind("<Motion>", self.reset_cursor_timer)
 
         self.temp_label = tk.Label(self.temp_row, text="--°", font=("Arial", 80, "bold"), fg="white", bg="black")
         self.temp_label.pack(side="left")
-        self.temp_label.bind("<Motion>", self.reset_cursor_timer)
 
         self.big_icon_label = tk.Label(self.temp_row, bg="black")
         self.big_icon_label.pack(side="left", padx=15)
-        self.big_icon_label.bind("<Motion>", self.reset_cursor_timer)
 
-        self.desc_label = tk.Label(self.curr_left, text="Ready.", font=("Arial", 14), fg="gray", bg="black")
+        self.desc_label = tk.Label(self.curr_left, text="Loading...", font=("Arial", 14), fg="gray", bg="black")
         self.desc_label.pack(anchor="w")
-        self.desc_label.bind("<Motion>", self.reset_cursor_timer)
 
         self.curr_right = tk.Frame(self.main_frame, bg="black")
         self.curr_right.pack(side="right", fill="both", expand=True)
-        self.curr_right.bind("<Motion>", self.reset_cursor_timer)
-
         self.details_label = tk.Label(self.curr_right, text="", font=("Courier New", 12), justify="left", fg="#4CAF50",
                                       bg="black")
         self.details_label.pack(anchor="e", pady=5)
-        self.details_label.bind("<Motion>", self.reset_cursor_timer)
 
         # 4. 5-Day Strip
         self.forecast_strip = tk.Frame(self.content_container, bg="black")
         self.forecast_strip.pack(side="top", fill="x", padx=10, pady=5)
-        self.forecast_strip.bind("<Motion>", self.reset_cursor_timer)
 
-        # Tooltip Overlay
         self.tooltip = tk.Label(self, text="", font=("Arial", 10), bg="#222", fg="white", relief="solid", bd=1, padx=8,
                                 pady=5)
         self.tooltip.place_forget()
@@ -243,7 +229,6 @@ class WeatherApp(tk.Tk):
         for i in range(5):
             box = tk.Frame(self.forecast_strip, bg="#111", highlightbackground="#222", highlightthickness=1)
             box.pack(side="left", expand=True, fill="both", padx=2)
-            box.bind("<Motion>", self.reset_cursor_timer)
 
             day = tk.Label(box, text="---", font=("Arial", 9, "bold"), fg="gray", bg="#111")
             day.pack(pady=2)
@@ -260,7 +245,6 @@ class WeatherApp(tk.Tk):
                          'details': ""}
             self.forecast_items.append(item_data)
 
-            # Bind Hover & Motion Events
             def on_enter(event, idx=i):
                 details = self.forecast_items[idx]['details']
                 if details:
@@ -274,125 +258,121 @@ class WeatherApp(tk.Tk):
 
             box.bind("<Enter>", on_enter)
             box.bind("<Leave>", on_leave)
-            for widget in box.winfo_children():
-                widget.bind("<Enter>", lambda e, idx=i: on_enter(e, idx))
-                widget.bind("<Leave>", lambda e, idx=i: on_leave(e, idx))
-                widget.bind("<Motion>", self.reset_cursor_timer)
+            for w in box.winfo_children():
+                w.bind("<Enter>", lambda e, idx=i: on_enter(e, idx))
+                w.bind("<Leave>", lambda e, idx=i: on_leave(e, idx))
+                w.bind("<Motion>", self.reset_cursor_timer)
 
     def show_setup_dialog(self):
         logging.info("Opening Settings Dialog...")
         setup = tk.Toplevel(self)
-        setup.title("Configuration")
         setup.geometry("500x380+150+50")
         setup.overrideredirect(True)
         setup.configure(bg="#222", highlightbackground="#4CAF50", highlightthickness=2)
-
         setup.transient(self)
         setup.lift()
         setup.attributes("-topmost", True)
         setup.grab_set()
-
-        # Ensure movement inside the dialog also resets the timer
         setup.bind("<Motion>", self.reset_cursor_timer)
 
-        tk.Label(setup, text="API SETTINGS", font=("Arial", 16, "bold"), fg="#4CAF50", bg="#222").pack(pady=15)
-        tk.Label(setup, text="OpenWeather Key:", fg="white", bg="#222").pack()
+        tk.Label(setup, text="API SETTINGS (ONE CALL 3.0)", font=("Arial", 14, "bold"), fg="#4CAF50", bg="#222").pack(
+            pady=10)
+
+        tk.Label(setup, text="API Key:", fg="white", bg="#222").pack()
         ent_key = tk.Entry(setup, width=40, font=("Arial", 12), bg="#333", fg="white", insertbackground="white")
         ent_key.insert(0, self.api_key or "")
         ent_key.pack(pady=5)
-        tk.Label(setup, text="Zipcode:", fg="white", bg="#222").pack()
-        ent_zip = tk.Entry(setup, width=15, font=("Arial", 12), bg="#333", fg="white", insertbackground="white")
-        ent_zip.insert(0, self.zipcode or "")
-        ent_zip.pack(pady=5)
+
+        tk.Label(setup, text="Latitude:", fg="white", bg="#222").pack()
+        ent_lat = tk.Entry(setup, width=15, font=("Arial", 12), bg="#333", fg="white", insertbackground="white")
+        ent_lat.insert(0, self.lat or "")
+        ent_lat.pack(pady=2)
+
+        tk.Label(setup, text="Longitude:", fg="white", bg="#222").pack()
+        ent_lon = tk.Entry(setup, width=15, font=("Arial", 12), bg="#333", fg="white", insertbackground="white")
+        ent_lon.insert(0, self.lon or "")
+        ent_lon.pack(pady=2)
 
         def save():
-            k, z = ent_key.get().strip(), ent_zip.get().strip()
-            if k and z:
-                changed = (k != self.api_key or z != self.zipcode)
-                save_setting("api_key", k)
-                save_setting("zipcode", z)
-                self.api_key, self.zipcode = k, z
+            k, lt, ln = ent_key.get().strip(), ent_lat.get().strip(), ent_lon.get().strip()
+            if k and lt and ln:
+                changed = (k != self.api_key or lt != self.lat or ln != self.lon)
+                save_setting("api_key", k);
+                save_setting("lat", lt);
+                save_setting("lon", ln)
+                self.api_key, self.lat, self.lon = k, lt, ln
                 setup.destroy()
                 if changed: self.update_weather()
             else:
                 messagebox.showwarning("Error", "All fields required.")
 
-        def force_exit():
-            logging.info("Shutting down app.")
-            self.quit()
-            self.destroy()
-            sys.exit(0)
-
         tk.Button(setup, text="SAVE & REFRESH", command=save, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"),
-                  width=20, height=2).pack(pady=10)
-        tk.Button(setup, text="QUIT APP", command=force_exit, bg="#f44336", fg="white", font=("Arial", 10, "bold"),
-                  width=20, height=2).pack(pady=5)
+                  width=20, height=2).pack(pady=15)
+        tk.Button(setup, text="QUIT APP", command=lambda: sys.exit(0), bg="#f44336", fg="white", width=20).pack()
         tk.Button(setup, text="CANCEL", command=setup.destroy, bg="#222", fg="gray", bd=0).pack(side="bottom", pady=5)
 
     def update_weather(self):
-        if not self.api_key or not self.zipcode: return
-        logging.info("Fetching weather data...")
+        if not self.api_key or not self.lat or not self.lon: return
         try:
-            url = f"http://api.openweathermap.org/data/2.5/forecast?zip={self.zipcode},us&appid={self.api_key}&units=imperial"
+            url = f"https://api.openweathermap.org/data/3.0/onecall?lat={self.lat}&lon={self.lon}&appid={self.api_key}&units=imperial"
             res = requests.get(url).json()
 
-            if str(res.get("cod")) == "200":
-                curr = res["list"][0]
-                icon_code = curr['weather'][0]['icon']
-
-                self.city_label.config(text=res["city"]["name"])
-                self.temp_label.config(text=f"{int(curr['main']['temp'])}°")
+            if "current" in res:
+                curr = res["current"]
+                self.city_label.config(text=res.get("timezone", "Local").split('/')[-1].replace('_', ' '))
+                self.temp_label.config(text=f"{int(curr['temp'])}°")
                 self.desc_label.config(text=curr['weather'][0]['description'].capitalize())
 
-                img_big = self.get_weather_icon(icon_code, size="@4x")
+                img_big = self.get_weather_icon(curr['weather'][0]['icon'], size="@4x")
                 if img_big: self.big_icon_label.config(image=img_big)
 
-                det = (f"Feels: {int(curr['main']['feels_like'])}°\n"
-                       f"Humid: {curr['main']['humidity']}%\n"
-                       f"Wind:  {curr['wind']['speed']} mph\n"
-                       f"Pres:  {curr['main']['pressure']} hPa\n"
+                det = (f"Feels: {int(curr['feels_like'])}°\n"
+                       f"Humid: {curr['humidity']}%\n"
+                       f"Wind:  {int(curr['wind_speed'])} mph\n"
+                       f"UV:    {curr.get('uvi', 0)}\n"
                        f"Vis:   {curr.get('visibility', 0) / 1000:.1f} km")
                 self.details_label.config(text=det)
 
-                daily = res["list"][::8]
-                for i, data in enumerate(daily[:5]):
-                    m = data['main']
-                    w = data['weather'][0]
-                    self.forecast_items[i]['day'].config(text=datetime.fromtimestamp(data['dt']).strftime("%a").upper())
-                    self.forecast_items[i]['temp_feel'].config(text=f"{int(m['temp'])}°/{int(m['feels_like'])}°")
-                    self.forecast_items[i]['min_max'].config(text=f"L:{int(m['temp_min'])} H:{int(m['temp_max'])}")
-                    self.forecast_items[i]['humidity'].config(text=f"H:{m['humidity']}%")
-
-                    self.forecast_items[i]['details'] = (
-                        f"{w['description'].capitalize()}\n"
-                        f"Wind: {data['wind']['speed']} mph\n"
-                        f"Clouds: {data['clouds']['all']}%"
-                    )
-
+                # Forecast
+                for i, day_data in enumerate(res.get("daily", [])[1:6]):
+                    w = day_data['weather'][0]
+                    t = day_data['temp']
+                    self.forecast_items[i]['day'].config(
+                        text=datetime.fromtimestamp(day_data['dt']).strftime("%a").upper())
+                    self.forecast_items[i]['temp_feel'].config(
+                        text=f"{int(t['day'])}°/{int(day_data['feels_like']['day'])}°")
+                    self.forecast_items[i]['min_max'].config(text=f"L:{int(t['min'])} H:{int(t['max'])}")
+                    self.forecast_items[i]['humidity'].config(text=f"H:{day_data['humidity']}%")
+                    self.forecast_items[i][
+                        'details'] = f"{w['description'].capitalize()}\nRain: {day_data.get('rain', 0)}mm"
                     img_f = self.get_weather_icon(w['icon'], size="@2x")
                     if img_f: self.forecast_items[i]['icon'].config(image=img_f)
 
-                self.alert_canvas.itemconfig(self.alert_text,
-                                             text=f"Last Sync: {datetime.now().strftime('%H:%M')}. All conditions normal.")
+                # Alerts
+                alerts = res.get("alerts", [])
+                if alerts:
+                    msg = "  |  ".join([f"⚠️ {a['event'].upper()}: {a['sender_name']}" for a in alerts])
+                    self.alert_canvas.config(bg="darkred")
+                    self.alert_canvas.itemconfig(self.alert_text, text=msg, fill="white")
+                else:
+                    self.alert_canvas.config(bg="#111")
+                    self.alert_canvas.itemconfig(self.alert_text, text=f"Last Sync: {datetime.now().strftime('%H:%M')}",
+                                                 fill="gray")
             else:
-                self.desc_label.config(text=f"API: {res.get('message')}")
+                self.desc_label.config(text=f"API Error: {res.get('message', 'Check Settings')}")
         except Exception as e:
-            logging.error(f"Update error: {e}", exc_info=True)
-
+            logging.error(f"Update error: {e}")
         self.after(600000, self.update_weather)
 
     def scroll_alerts(self):
         try:
             coords = self.alert_canvas.coords(self.alert_text)
-            if not coords:
-                self.after(500, self.scroll_alerts)
-                return
-            self.alert_canvas.move(self.alert_text, -2, 0)
-            if coords[0] < -750:
-                self.alert_canvas.coords(self.alert_text, 800, 17)
-            self.after(35, self.scroll_alerts)
-        except Exception:
-            self.after(1000, self.scroll_alerts)
+            if coords:
+                self.alert_canvas.move(self.alert_text, -2, 0)
+                if coords[0] < -1000: self.alert_canvas.coords(self.alert_text, 800, 17)
+        except:
+            pass
+        self.after(35, self.scroll_alerts)
 
 
 if __name__ == "__main__":
