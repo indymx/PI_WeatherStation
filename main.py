@@ -118,6 +118,11 @@ class WeatherApp(tk.Tk):
         self.zipcode = get_setting("zipcode")
         self.icon_cache = {}
 
+        # Mouse Idle Logic
+        self.cursor_visible = True
+        self.hide_timer = None
+        self.bind("<Motion>", self.reset_cursor_timer)
+
         self.setup_ui()
 
         if not self.api_key or not self.zipcode:
@@ -126,6 +131,22 @@ class WeatherApp(tk.Tk):
             self.after(500, self.update_weather)
 
         self.after(2000, self.scroll_alerts)
+        self.reset_cursor_timer()
+
+    def reset_cursor_timer(self, event=None):
+        if not self.cursor_visible:
+            self.config(cursor="arrow")
+            self.cursor_visible = True
+
+        if self.hide_timer:
+            self.after_cancel(self.hide_timer)
+
+        # 180000ms = 3 minutes
+        self.hide_timer = self.after(180000, self.hide_cursor)
+
+    def hide_cursor(self):
+        self.config(cursor="none")
+        self.cursor_visible = False
 
     def get_weather_icon(self, icon_code, size="@2x"):
         cache_key = f"{icon_code}{size}"
@@ -150,53 +171,68 @@ class WeatherApp(tk.Tk):
         self.top_bar = tk.Frame(self, bg="#111", height=45)
         self.top_bar.pack(side="top", fill="x")
         self.top_bar.pack_propagate(False)
+        self.top_bar.bind("<Motion>", self.reset_cursor_timer)
 
         self.settings_btn = tk.Button(self.top_bar, text=" ⚙ CONFIGURATION ", font=("Arial", 10, "bold"),
                                       fg="white", bg="#444", bd=1, relief="raised",
                                       activebackground="#666", activeforeground="white",
                                       command=self.show_setup_dialog)
         self.settings_btn.pack(side="right", padx=10, pady=5)
+        self.settings_btn.bind("<Motion>", self.reset_cursor_timer)
 
-        # 2. Alert Scroller (Reserved space at bottom)
+        # 2. Alert Scroller
         self.alert_canvas = tk.Canvas(self, height=35, bg="darkred", highlightthickness=0)
         self.alert_canvas.pack(side="bottom", fill="x")
         self.alert_text = self.alert_canvas.create_text(800, 17, text="Connecting to weather service...",
                                                         fill="white", font=("Arial", 11, "bold"), anchor="w")
+        self.alert_canvas.bind("<Motion>", self.reset_cursor_timer)
 
         # 3. Main Body
         self.content_container = tk.Frame(self, bg="black")
         self.content_container.pack(side="top", fill="both", expand=True)
+        self.content_container.bind("<Motion>", self.reset_cursor_timer)
 
         self.main_frame = tk.Frame(self.content_container, bg="black")
         self.main_frame.pack(side="top", fill="both", expand=True, padx=20, pady=5)
+        self.main_frame.bind("<Motion>", self.reset_cursor_timer)
 
         self.curr_left = tk.Frame(self.main_frame, bg="black")
         self.curr_left.pack(side="left", fill="both", expand=True)
+        self.curr_left.bind("<Motion>", self.reset_cursor_timer)
 
         self.city_label = tk.Label(self.curr_left, text="---", font=("Arial", 24), fg="white", bg="black")
         self.city_label.pack(anchor="w")
+        self.city_label.bind("<Motion>", self.reset_cursor_timer)
 
         self.temp_row = tk.Frame(self.curr_left, bg="black")
         self.temp_row.pack(anchor="w")
+        self.temp_row.bind("<Motion>", self.reset_cursor_timer)
 
         self.temp_label = tk.Label(self.temp_row, text="--°", font=("Arial", 80, "bold"), fg="white", bg="black")
         self.temp_label.pack(side="left")
+        self.temp_label.bind("<Motion>", self.reset_cursor_timer)
 
         self.big_icon_label = tk.Label(self.temp_row, bg="black")
         self.big_icon_label.pack(side="left", padx=15)
+        self.big_icon_label.bind("<Motion>", self.reset_cursor_timer)
 
         self.desc_label = tk.Label(self.curr_left, text="Ready.", font=("Arial", 14), fg="gray", bg="black")
         self.desc_label.pack(anchor="w")
+        self.desc_label.bind("<Motion>", self.reset_cursor_timer)
 
         self.curr_right = tk.Frame(self.main_frame, bg="black")
         self.curr_right.pack(side="right", fill="both", expand=True)
+        self.curr_right.bind("<Motion>", self.reset_cursor_timer)
+
         self.details_label = tk.Label(self.curr_right, text="", font=("Courier New", 12), justify="left", fg="#4CAF50",
                                       bg="black")
         self.details_label.pack(anchor="e", pady=5)
+        self.details_label.bind("<Motion>", self.reset_cursor_timer)
 
         # 4. 5-Day Strip
         self.forecast_strip = tk.Frame(self.content_container, bg="black")
         self.forecast_strip.pack(side="top", fill="x", padx=10, pady=5)
+        self.forecast_strip.bind("<Motion>", self.reset_cursor_timer)
 
         # Tooltip Overlay
         self.tooltip = tk.Label(self, text="", font=("Arial", 10), bg="#222", fg="white", relief="solid", bd=1, padx=8,
@@ -207,6 +243,7 @@ class WeatherApp(tk.Tk):
         for i in range(5):
             box = tk.Frame(self.forecast_strip, bg="#111", highlightbackground="#222", highlightthickness=1)
             box.pack(side="left", expand=True, fill="both", padx=2)
+            box.bind("<Motion>", self.reset_cursor_timer)
 
             day = tk.Label(box, text="---", font=("Arial", 9, "bold"), fg="gray", bg="#111")
             day.pack(pady=2)
@@ -223,7 +260,7 @@ class WeatherApp(tk.Tk):
                          'details': ""}
             self.forecast_items.append(item_data)
 
-            # Bind Hover Events
+            # Bind Hover & Motion Events
             def on_enter(event, idx=i):
                 details = self.forecast_items[idx]['details']
                 if details:
@@ -240,13 +277,12 @@ class WeatherApp(tk.Tk):
             for widget in box.winfo_children():
                 widget.bind("<Enter>", lambda e, idx=i: on_enter(e, idx))
                 widget.bind("<Leave>", lambda e, idx=i: on_leave(e, idx))
+                widget.bind("<Motion>", self.reset_cursor_timer)
 
     def show_setup_dialog(self):
         logging.info("Opening Settings Dialog...")
         setup = tk.Toplevel(self)
         setup.title("Configuration")
-
-        # OverrideRedirect ensures the popup layers correctly over the kiosk main window
         setup.geometry("500x380+150+50")
         setup.overrideredirect(True)
         setup.configure(bg="#222", highlightbackground="#4CAF50", highlightthickness=2)
@@ -256,21 +292,24 @@ class WeatherApp(tk.Tk):
         setup.attributes("-topmost", True)
         setup.grab_set()
 
+        # Ensure movement inside the dialog also resets the timer
+        setup.bind("<Motion>", self.reset_cursor_timer)
+
         tk.Label(setup, text="API SETTINGS", font=("Arial", 16, "bold"), fg="#4CAF50", bg="#222").pack(pady=15)
         tk.Label(setup, text="OpenWeather Key:", fg="white", bg="#222").pack()
         ent_key = tk.Entry(setup, width=40, font=("Arial", 12), bg="#333", fg="white", insertbackground="white")
-        ent_key.insert(0, self.api_key or "");
+        ent_key.insert(0, self.api_key or "")
         ent_key.pack(pady=5)
         tk.Label(setup, text="Zipcode:", fg="white", bg="#222").pack()
         ent_zip = tk.Entry(setup, width=15, font=("Arial", 12), bg="#333", fg="white", insertbackground="white")
-        ent_zip.insert(0, self.zipcode or "");
+        ent_zip.insert(0, self.zipcode or "")
         ent_zip.pack(pady=5)
 
         def save():
             k, z = ent_key.get().strip(), ent_zip.get().strip()
             if k and z:
                 changed = (k != self.api_key or z != self.zipcode)
-                save_setting("api_key", k);
+                save_setting("api_key", k)
                 save_setting("zipcode", z)
                 self.api_key, self.zipcode = k, z
                 setup.destroy()
