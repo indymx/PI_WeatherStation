@@ -27,6 +27,12 @@ logging.basicConfig(
     filemode='w'
 )
 
+
+def update_logging_level():
+    debug_enabled = get_setting("debug_enabled") == "True"
+    level = logging.DEBUG if debug_enabled else logging.INFO
+    logging.getLogger().setLevel(level)
+
 # --- 3. Database Management ---
 DB_DIR = os.path.join(application_path, "settings")
 DB_PATH = os.path.join(DB_DIR, "settings.db")
@@ -70,6 +76,7 @@ def save_setting(key, value):
 class WeatherApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
+        update_logging_level()
         logging.info("Initializing WeatherApp...")
 
         self.api_key = get_setting("api_key")
@@ -289,6 +296,12 @@ class WeatherApp(tk.Tk):
         current_zip = get_setting("zip_code") or ""
         e_zip.insert(0, current_zip)
         e_zip.pack(pady=5)
+
+        # Debug Checkbox
+        debug_var = tk.BooleanVar(value=(get_setting("debug_enabled") == "True"))
+        tk.Checkbutton(setup, text="Enable Debug Logging", variable=debug_var,
+                       fg="white", bg="#222", selectcolor="#333",
+                       activebackground="#222", activeforeground="white").pack(pady=10)
 
         def save():
             api_key = e_key.get()
