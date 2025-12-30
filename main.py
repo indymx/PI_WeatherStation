@@ -306,6 +306,7 @@ class WeatherApp(tk.Tk):
         def save():
             api_key = e_key.get()
             zip_code = e_zip.get()
+            debug_enabled = str(debug_var.get())
 
             try:
                 # Use Zippopotam.us for free zip-to-lat-lon conversion (No API Key required)
@@ -325,6 +326,9 @@ class WeatherApp(tk.Tk):
                     save_setting("lon", new_lon)
                     save_setting("city_name", city_name)
                     save_setting("state_abbr", state_abbr)
+                    save_setting("debug_enabled", debug_enabled)
+
+                    update_logging_level()
 
                     self.api_key, self.lat, self.lon = api_key, new_lat, new_lon
                     setup.destroy()
