@@ -65,7 +65,7 @@ On the first launch, the application will automatically open the **API CONFIG** 
 ## 📂 Project Structure
 
 *   `main.py`: The core application logic and UI rendering.
-*   `settings/`: Contains the SQLite database (`settings.db`) for saved configurations Will be created automatically on first launch.
+*   `settings/`: Contains the SQLite database (`settings.db`) for saved configurations. File will be created automatically on first launch.
 *   `images/`: Directory for weather icons and background overlays.
 *   `weather_debug.log`: Automatically generated log file for troubleshooting.
 
