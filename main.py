@@ -75,6 +75,8 @@ class WeatherApp(tk.Tk):
         self.api_key = get_setting("api_key")
         self.lat = get_setting("lat")
         self.lon = get_setting("lon")
+        self.city = get_setting("city_name"),
+        self.state = get_setting("state_abbr"),
         self.bg_image_ref = None
         self.forecast_details = []
 
@@ -107,7 +109,7 @@ class WeatherApp(tk.Tk):
         tk.Button(self.top_bar, text=" CONFIG ", font=("Arial", 8, "bold"), fg="white", bg="#333",
                   command=self.show_setup_dialog).pack(side="right", padx=10, pady=4)
 
-        self.alert_canvas = tk.Canvas(self, height=30, bg="#111", highlightthickness=0)
+        self.alert_canvas = tk.Canvas(self, height=30, bg="darkred", highlightthickness=0)
         self.alert_canvas.place(x=0, y=450, width=800)
         self.alert_text = self.alert_canvas.create_text(800, 15, text="Ready...", fill="white",
                                                         font=("Arial", 10, "bold"), anchor="w")
@@ -148,6 +150,10 @@ class WeatherApp(tk.Tk):
                     x_box = 10 + (i * 158)
                     draw_ov.rectangle([x_box, 305, x_box + 152, 442], fill=glass_color, outline=(255, 255, 255, 40),
                                       width=1)
+                    # Darker sub-box for the detailed text area
+                    draw_ov.rectangle([x_box + 3, 355, x_box + 149, 435], fill=(0, 0, 0, 175),
+                                      outline=(255, 255, 255, 20), width=1)
+
                 canvas = Image.alpha_composite(canvas, overlay)
 
                 # 2. Text Rendering
@@ -174,10 +180,10 @@ class WeatherApp(tk.Tk):
                 else:
                     location_text = res.get("timezone", "Local").split('/')[-1].replace('_', ' ')
 
-                draw.text((30, 60), location_text, font=f_city, fill="white")
-                draw.text((25, 95), f"{int(curr['temp'])}°", font=f_temp, fill="white")
-
-                draw.text((30, 215), curr['weather'][0]['description'].capitalize(), font=f_desc, fill="#CCCCCC")
+                draw.text((30, 60), location_text, font=f_city, fill="#FFFFFF")
+                draw.text((25, 95), f"{int(curr['temp'])}°", font=f_temp, fill="#FFFFFF")
+                draw.text((30, 215), curr['weather'][0]['description'].capitalize(), font=f_desc, fill="#FFFFFF")
+                draw.text((30, 240), datetime.now().strftime("%m/%d"), font=f_det, fill="#FFFFFF")
 
                 ic_path = os.path.join(application_path, "images", f"{icon_code}_t@4x.png")
                 if os.path.exists(ic_path):
@@ -189,7 +195,11 @@ class WeatherApp(tk.Tk):
                        f"Humid: {curr['humidity']}%\n"
                        f"Wind:  {int(curr['wind_speed'])} mph\n"
                        f"UV:    {curr.get('uvi', 0)}\n"
-                       f"Vis:   {curr.get('visibility', 0) / 1000:.1f} km")
+                       f"Vis:   {curr.get('visibility', 0) / 1609.34:.1f} mi\n"
+                       f"Sunrise: {datetime.fromtimestamp(curr['sunrise']).strftime('%H:%M')}\n"
+                       f"Sunset:  {datetime.fromtimestamp(curr['sunset']).strftime('%H:%M')}\n"
+                       f"Dew Point: {int(curr['dew_point'])}°\n"
+                       )
                 draw.multiline_text((545, 65), det, font=f_det, fill="white", spacing=8)
 
                 # Forecast
@@ -206,23 +216,44 @@ class WeatherApp(tk.Tk):
                         f"Clouds: {d_data.get('clouds', 0)}%"
                     )
 
-                    draw.text((x + 5, 312), datetime.fromtimestamp(d_data['dt']).strftime("%a").upper(), font=f_day,
-                              fill="#AAAAAA")
+                    day_str = datetime.fromtimestamp(d_data['dt']).strftime("%a").upper()
+                    date_str = datetime.fromtimestamp(d_data['dt']).strftime("%m/%d")
+                    draw.text((x + 5, 312), f"{day_str} {date_str}", font=f_day, fill="#FFFFFF")
+
                     fi_path = os.path.join(application_path, "images", f"{w['icon']}_t@2x.png")
                     if os.path.exists(fi_path):
                         fi = Image.open(fi_path).convert("RGBA")
-                        canvas.alpha_composite(fi, (x + 10, 325))
-                    draw.text((x + 5, 395), f"{int(t['day'])}°/{int(fl['day'])}°", font=f_f_t, fill="white")
-                    draw.text((x + 5, 412), f"L:{int(t['min'])} H:{int(t['max'])}", font=f_f_mm, fill="#AAAAAA")
-                    draw.text((x + 5, 427), f"H:{d_data['humidity']}%", font=f_hum, fill="#00BCD4")
+                        canvas.alpha_composite(fi, (x + 45, 280))
 
-                # Refresh
+                    draw.text((x + 5, 360), f"{int(t['day'])}°/{int(fl['day'])}°", font=f_f_t, fill="#FFFFFF")
+                    draw.text((x + 5, 375), f"L:{int(t['min'])} H:{int(t['max'])}", font=f_f_mm, fill="#FFFFFF")
+                    draw.text((x + 5, 390), f"H:{d_data['humidity']}%", font=f_hum, fill="#48ff00")
+                    draw.text((x + 5, 405), f"Sunrise: {datetime.fromtimestamp(d_data['sunrise']).strftime('%H:%M')}",
+                              font=f_f_mm, fill="#FFFFFF")
+                    draw.text((x + 5, 420), f"Sunset:  {datetime.fromtimestamp(d_data['sunset']).strftime('%H:%M')}",
+                              font=f_f_mm, fill="#FFFFFF")
+
+                # --- MOVE REFRESH LOGIC OUT OF THE FOR LOOP ---
                 photo = ImageTk.PhotoImage(canvas)
                 self.bg_label.config(image=photo)
                 self.bg_image_ref = photo
                 logging.info("Render complete.")
-                self.alert_canvas.itemconfig(self.alert_text, text=f"Last Sync: {datetime.now().strftime('%H:%M')}",
-                                             fill="gray")
+
+                # 3. Handle Alerts in Scroller
+                alert_msgs = []
+                if "alerts" in res:
+                    for alert in res["alerts"]:
+                        event = alert.get("event", "Alert")
+                        desc = alert.get("description", "").replace("\n", " ")
+                        alert_msgs.append(f"*** {event.upper()}: {desc} ***")
+
+                if alert_msgs:
+                    full_alert_text = "     ".join(alert_msgs)
+                else:
+                    full_alert_text = f"Last Sync: {datetime.now().strftime('%H:%M')}"
+
+                self.alert_canvas.itemconfig(self.alert_text, text=full_alert_text, fill="white")
+
         except Exception as e:
             logging.error(f"Weather update fail: {e}")
         self.after(600000, self.update_weather)
