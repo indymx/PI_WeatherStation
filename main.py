@@ -1,13 +1,13 @@
 import logging
-import sys
 import os
-import tkinter as tk
-from tkinter import messagebox
 import sqlite3
+import sys
+import tkinter as tk
+from datetime import datetime
+from tkinter import messagebox
+
 import requests
 from PIL import Image, ImageTk, ImageDraw, ImageFont
-from datetime import datetime
-import subprocess
 
 # --- 1. Path & Display Configuration ---
 if "DISPLAY" not in os.environ:
@@ -271,23 +271,23 @@ class WeatherApp(tk.Tk):
 
     def show_setup_dialog(self):
         logging.info("Opening setup.")
-        setup = tk.Toplevel(self);
-        setup.geometry("400x320+200+80");
+        setup = tk.Toplevel(self)
+        setup.geometry("400x320+200+80")
         setup.overrideredirect(True)
         setup.configure(bg="#222", highlightthickness=2, highlightbackground="#4CAF50")
         setup.grab_set()
         tk.Label(setup, text="API CONFIG", fg="#4CAF50", bg="#222", font=("Arial", 12, "bold")).pack(pady=15)
 
         tk.Label(setup, text="OpenWeather API Key", fg="white", bg="#222", font=("Arial", 9)).pack()
-        e_key = tk.Entry(setup, width=35);
-        e_key.insert(0, self.api_key or "");
+        e_key = tk.Entry(setup, width=35)
+        e_key.insert(0, self.api_key or "")
         e_key.pack(pady=5)
 
         tk.Label(setup, text="Zip Code", fg="white", bg="#222", font=("Arial", 9)).pack()
-        e_zip = tk.Entry(setup, width=15, justify='center');
+        e_zip = tk.Entry(setup, width=15, justify='center')
         # Try to load existing zip, or leave blank
         current_zip = get_setting("zip_code") or ""
-        e_zip.insert(0, current_zip);
+        e_zip.insert(0, current_zip)
         e_zip.pack(pady=5)
 
         def save():
