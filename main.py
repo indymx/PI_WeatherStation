@@ -68,7 +68,7 @@ def save_setting(key, value):
 
 # --- 4. Main Application ---
 class WeatherApp(tk.Tk):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         logging.info("Initializing WeatherApp...")
 
