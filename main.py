@@ -76,6 +76,7 @@ def save_setting(key, value):
 class WeatherApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
+
         update_logging_level()
         logging.info("Initializing WeatherApp...")
 
@@ -85,6 +86,11 @@ class WeatherApp(tk.Tk):
         self.city = get_setting("city_name"),
         self.state = get_setting("state_abbr"),
         self.bg_image_ref = None
+        self.alert_text = None
+        self.alert_canvas = None
+        self.top_bar = None
+        self.tooltip = None
+        self.bg_label = None
         self.forecast_details = []
 
         self.geometry("800x480+0+0")
