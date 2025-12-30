@@ -38,13 +38,23 @@ Before running the application, ensure you have:
 2.  **Install dependencies:**
     ```bash
     pip install pillow requests
+    sudo apt install ttf-mscorefonts-installer
     ```
 
 3.  **Run the application:**
     ```bash
     python main.py
     ```
-
+4. **Create Executable:**
+   ```bash
+   sudo apt install python3-pyinstaller
+   python3 -m PyInstaller --noconfirm --onedir --windowed \
+    --add-data "/home/terry/WeatherDisplay/images:images" \
+    --hidden-import "PIL._tkinter_finder" \
+    --name "WeatherStation" \
+    main.py
+   ```
+   
 ## ⚙️ Configuration
 
 On the first launch, the application will automatically open the **API CONFIG** dialog.
