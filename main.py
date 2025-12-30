@@ -166,9 +166,17 @@ class WeatherApp(tk.Tk):
                     f_city = f_temp = f_desc = f_det = f_day = f_f_t = f_f_mm = f_hum = ImageFont.load_default()
 
                 # Current
-                city_name = res.get("timezone", "Local").split('/')[-1].replace('_', ' ')
-                draw.text((30, 60), city_name, font=f_city, fill="white")
+                display_city = get_setting("city_name")
+                display_state = get_setting("state_abbr")
+
+                if display_city and display_state:
+                    location_text = f"{display_city}, {display_state}"
+                else:
+                    location_text = res.get("timezone", "Local").split('/')[-1].replace('_', ' ')
+
+                draw.text((30, 60), location_text, font=f_city, fill="white")
                 draw.text((25, 95), f"{int(curr['temp'])}°", font=f_temp, fill="white")
+
                 draw.text((30, 215), curr['weather'][0]['description'].capitalize(), font=f_desc, fill="#CCCCCC")
 
                 ic_path = os.path.join(application_path, "images", f"{icon_code}_t@4x.png")
@@ -238,26 +246,56 @@ class WeatherApp(tk.Tk):
         setup.configure(bg="#222", highlightthickness=2, highlightbackground="#4CAF50")
         setup.grab_set()
         tk.Label(setup, text="API CONFIG", fg="#4CAF50", bg="#222", font=("Arial", 12, "bold")).pack(pady=15)
+
+        tk.Label(setup, text="OpenWeather API Key", fg="white", bg="#222", font=("Arial", 9)).pack()
         e_key = tk.Entry(setup, width=35);
         e_key.insert(0, self.api_key or "");
         e_key.pack(pady=5)
-        e_lat = tk.Entry(setup, width=15);
-        e_lat.insert(0, self.lat or "");
-        e_lat.pack()
-        e_lon = tk.Entry(setup, width=15);
-        e_lon.insert(0, self.lon or "");
-        e_lon.pack(pady=5)
+
+        tk.Label(setup, text="Zip Code", fg="white", bg="#222", font=("Arial", 9)).pack()
+        e_zip = tk.Entry(setup, width=15, justify='center');
+        # Try to load existing zip, or leave blank
+        current_zip = get_setting("zip_code") or ""
+        e_zip.insert(0, current_zip);
+        e_zip.pack(pady=5)
 
         def save():
-            save_setting("api_key", e_key.get());
-            save_setting("lat", e_lat.get());
-            save_setting("lon", e_lon.get())
-            self.api_key, self.lat, self.lon = e_key.get(), e_lat.get(), e_lon.get()
-            setup.destroy();
-            self.update_weather()
+            api_key = e_key.get()
+            zip_code = e_zip.get()
+
+            try:
+                # Use Zippopotam.us for free zip-to-lat-lon conversion (No API Key required)
+                geo_url = f"https://api.zippopotam.us/us/{zip_code}"
+                response = requests.get(geo_url, timeout=10)
+
+                if response.status_code == 200:
+                    geo_data = response.json()
+                    place = geo_data["places"][0]
+                    new_lat, new_lon = place["latitude"], place["longitude"]
+                    city_name = place["place name"]
+                    state_abbr = place["state abbreviation"]
+
+                    save_setting("api_key", api_key)
+                    save_setting("zip_code", zip_code)
+                    save_setting("lat", new_lat)
+                    save_setting("lon", new_lon)
+                    save_setting("city_name", city_name)
+                    save_setting("state_abbr", state_abbr)
+
+                    self.api_key, self.lat, self.lon = api_key, new_lat, new_lon
+                    setup.destroy()
+                    self.update_weather()
+                else:
+
+                    messagebox.showerror("Error", f"Could not find Zip Code: {zip_code}")
+            except Exception as e:
+                logging.error(f"Geocoding error: {e}")
+                messagebox.showerror("Error", "Failed to connect to geocoding service")
 
         tk.Button(setup, text=" SAVE & SYNC ", bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), width=15,
                   command=save).pack(pady=15)
+        tk.Button(setup, text=" CANCEL ", bg="#444", fg="white", width=15,
+                  command=setup.destroy).pack(pady=5)
         tk.Button(setup, text=" EXIT APP ", bg="#333", fg="red", command=lambda: sys.exit(0)).pack()
 
 
